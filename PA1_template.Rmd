@@ -8,28 +8,67 @@ output:
 
 ## Loading and preprocessing the data
 
-```{r}
+The data being analyzed  consists of two months of activity data of an anonymous individual. It tracks the number of steps taken throughout the day, captured in 5-minute intervals. The [raw data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) was provided as part of the Reproducible Research course on Coursera.
+
+```{r set_options}
+suppressMessages( library(dplyr) )
+suppressMessages( library(ggplot2) )
+options(scipen=5, digits=6)
+```
+
+```{r load_data}
 activity <- read.csv("activity.csv", quote="\"", comment.char="", colClasses=c("numeric","Date","numeric"))
+activity <- mutate(activity, hour = floor(interval / 100), minute = interval %% 100 )
+activity <- mutate(activity, time = paste0(hour,":",formatC(minute, width=2, flag=0)))
+activity <- mutate(activity, interval_seq = hour*12 + minute/5 + 1)
 ```
 
 ## What is mean total number of steps taken per day?
 
+First we explore the data, using a histogram showing the distribution of total steps per day, and calculating the mean and median steps per day.
+
 ```{r steps_by_day}
-# steps_by_day <- with(activity,rowsum(steps, factor(date), na.rm=T))
-
-suppressMessages(library(dplyr))
-suppressMessages(library(ggplot2))
-
 by_day <- group_by(activity, date) %>%
     summarize(steps = sum(steps, na.rm=T))
 
-ggplot(by_day, aes(by_day$steps)) + geom_histogram()
+binsize = (max(by_day$steps) - min(by_day$steps)) / 15
+ggplot(by_day, aes(steps)) +
+    geom_histogram( binwidth = binsize ) +
+    labs(title = paste("Histogram of Steps Per Day, in", round(binsize, digits=0), "step bins")) + 
+    labs(x = "steps", y = "days")
 ```
 
 
+```{r}
+by_day_aggs <- summarize(by_day, mean = mean(by_day$steps),
+                               median = median(by_day$steps) )
+```
+
+The mean steps per day is **`r by_day_aggs$mean`**, and the median is **`r by_day_aggs$median`**
+
+
 ## What is the average daily activity pattern?
+The average number of steps taken in each of the 288 5-minute intervals every day shows the daily trend in step activity. 
+
+```{r steps_by_interval}
+by_interval <- group_by(activity, interval_seq) %>%
+    summarize(steps = mean(steps, na.rm=T), time = time)
+
+ggplot(by_interval, aes(interval_seq, steps)) +
+    geom_line() +
+    labs(title = "Average Steps Per 5 minute interval each day") + 
+    labs(x = "5 minute interval in day", y = "average steps")
+```
 
 
+```{r maximum_interval}
+max_interval <- filter(by_interval, steps == max(steps))
+max_steps <- max_interval$steps
+interval_min = max_interval$interval_seq * 5
+max_time <- paste0(floor(interval_min / 60), ":", interval_min %% 60)
+```
+
+The maximum average steps in any 5 minute interval is **`r max_steps`**, at **`r max_time`** each day.
 
 ## Imputing missing values
 
