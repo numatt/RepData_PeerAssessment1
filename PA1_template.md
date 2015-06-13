@@ -21,9 +21,11 @@ options(scipen=5, digits=6)
 ```r
 activity <- read.csv("activity.csv", quote="\"", comment.char="",
                      colClasses=c("numeric","Date","numeric"))
-activity <- mutate(activity, hour = floor(interval / 100), minute = interval %% 100 )
-activity <- mutate(activity, time = paste0(hour,":",formatC(minute, width=2, flag=0)))
-activity <- mutate(activity, interval_seq = hour*12 + minute/5 + 1)
+activity <- mutate(activity, hour = floor(interval / 100), minute = interval %% 100 ) %>%
+            mutate(time = paste0(hour,":",formatC(minute, width=2, flag=0))) %>%
+            mutate(interval_seq = hour*12 + minute/5 + 1) %>%
+            mutate(daytype = factor( ifelse(weekdays(activity$date) %in%
+                        c("Saturday","Sunday"),"weekend","weekday")))
 ```
 
 ## What is mean total number of steps taken per day?
@@ -61,14 +63,8 @@ The average number of steps taken in each of the 288 5-minute intervals every da
 
 ```r
 by_interval <- group_by(activity, interval_seq) %>%
-    summarize(steps = mean(steps, na.rm=T), time = time)
-```
+    summarize(steps = mean(steps, na.rm=T))
 
-```
-## Error in eval(expr, envir, enclos): expecting a single value
-```
-
-```r
 ggplot(by_interval, aes(interval_seq, steps)) +
     geom_line() +
     labs(title = "Average Steps Per 5 minute interval each day") + 
@@ -112,14 +108,7 @@ We can use the data set with imputed missing values to get a more realistic view
 by_day_imputed <- group_by(activity_imputed, date) %>%
     summarize(steps = sum(steps, na.rm=T))
 
-binsize = (max(by_day_imputed$steps) - min(by_day-imputed$steps)) / 15
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'imputed' not found
-```
-
-```r
+binsize = (max(by_day_imputed$steps) - min(by_day_imputed$steps)) / 15
 ggplot(by_day_imputed, aes(steps)) +
     geom_histogram( binwidth = binsize ) +
     labs(title = paste("Histogram of Imputed Steps Per Day, in",
@@ -138,3 +127,35 @@ by_day_imputed_aggs <- summarize(by_day_imputed, mean = mean(steps),
 The mean imputed steps per day is **10765.6**, and the median is **10762**. By imputing missing values, we project that the average number of steps per day is actually higher than what is shown by treating missing data as if it represents 0 steps. This is demonstrated both by the increase mean and median, and also the distribution on the histogram with a pronounced reduction in the number of days in the first bin with the lowest step count.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+We now use this more realistic version of the data to see how the individual's step activity varies between the weekend and weekdays.
+
+
+```r
+activity_weekend <- filter(activity_imputed, daytype=='weekend')
+activity_weekday <- filter(activity_imputed, daytype=='weekday')
+
+weekend_by_interval <- group_by(activity_weekend, interval_seq) %>%
+    summarize(steps = mean(steps, na.rm=T))
+
+we_plot <- ggplot(weekend_by_interval, aes(interval_seq, steps)) +
+    geom_line() +
+    labs(title = "Weekend: Average Steps Per 5 minute interval each day") + 
+    labs(x = "5 minute interval in day", y = "average steps")
+
+weekday_by_interval <- group_by(activity_weekday, interval_seq) %>%
+    summarize(steps = mean(steps, na.rm=T))
+
+wd_plot <- ggplot(weekday_by_interval, aes(interval_seq, steps)) +
+    geom_line() +
+    labs(title = "Weekday: Average Steps Per 5 minute interval each day") + 
+    labs(x = "5 minute interval in day", y = "average steps")
+
+require(gridExtra)
+grid.arrange(we_plot, wd_plot)
+```
+
+![plot of chunk weekend_weekday_comparison](figure/weekend_weekday_comparison-1.png) 
+
+
+
+
